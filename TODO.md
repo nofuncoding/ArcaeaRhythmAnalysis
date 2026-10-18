@@ -29,4 +29,6 @@
 
 - [ ] P4 批量模式：`build --all` / `--jobs`。
 - [ ] `scenecontrol(...,hidegroup,...)` 的普通 timinggroup 是否应完全忽略，需谱面数据确认。
+- [ ] 拍号检测/显示；小节数显示
+- [ ] Debug overlay
 - [ ] 修 bug
