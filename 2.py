@@ -1,39 +1,52 @@
+import argparse
 import re
-import os
 from fractions import Fraction
 
-# 读取配置文件
-config_file = os.path.join(os.path.dirname(__file__), 'config.txt')
-with open(config_file, 'r', encoding='utf-8') as file:
-    config_lines = file.readlines()
-for line in config_lines:
-    if line.startswith('folder='):
-        folder = os.path.join(os.path.dirname(__file__), 'charts', f'{line.strip().split('=')[1].strip()}')
-    if line.startswith('speed='):
-        speed = float(line.strip().split('=')[1].strip())
-    if line.startswith('chart='):
-        chart = int(line.strip().split('=')[1].strip())
-if folder is None:
-    raise ValueError("Folder name not found in config file.")
+from arcaea_config import load_config
+from arcaea_rhythm.selection import SelectionError, resolve_selection
+from arcaea_rhythm.timing import valid_bpm
+
+parser = argparse.ArgumentParser(description='生成节奏数组')
+parser.add_argument('--config', help='配置文件路径（默认 config.toml 或 config.txt）')
+parser.add_argument('--folder', help='谱面文件夹名（覆盖配置/交互选择）')
+parser.add_argument('--chart', type=int, choices=(2, 3, 4), help='难度（覆盖配置/交互选择）')
+parser.add_argument('-v', '--verbose', action='store_true', help='打印完整节奏数组')
+args = parser.parse_args()
+
+try:
+    cfg = load_config(args.config)
+    folder_name, chart = resolve_selection(cfg, args.folder, args.chart)
+    cfg.folder, cfg.chart = folder_name, chart
+    cfg.__post_init__()
+except (OSError, ValueError, SelectionError) as exc:
+    raise SystemExit(str(exc)) from exc
+
+chart = cfg.chart
+speed = cfg.speed
 
 # 设置文件路径
-timing_file_path = os.path.join(folder, f'timing_{chart}.txt')
-rhythm_file_path = os.path.join(folder, f'rhythm_{chart}.txt')
-if chart == 2:
-    aff_file_path = os.path.join(folder, '0.aff')
-if chart == 3 or chart == 4:
-    aff_file_path = os.path.join(folder, '1.aff')
+timing_file_path = str(cfg.timing_file)
+rhythm_file_path = str(cfg.rhythm_file)
+aff_file_path = str(cfg.chart_dir / cfg.aff_name)
 
 # 解析timing
 with open(timing_file_path, 'r', encoding='utf-8') as file:
     timing_lines = file.readlines()
 timings = []
+skipped_timings = 0
 for line in timing_lines:
     match = re.search(r"timing\((\d+),([\d.]+),.*\);", line)
     if match:
         timestamp = int(match.group(1))
         bpm = float(match.group(2))
+        if not valid_bpm(bpm, cfg.max_bpm):
+            skipped_timings += 1
+            continue
         timings.append((timestamp, bpm))
+if skipped_timings:
+    print(f"忽略 {skipped_timings} 个特效 timing。")
+if not timings:
+    raise SystemExit(f"{timing_file_path} 中没有可用的 timing。")
 
 # 解析音符时间（tap, hold, arc, arctap）
 with open(aff_file_path, 'r', encoding='utf-8') as file:
@@ -67,6 +80,8 @@ for line in lines:
         start_time = int(start_time_str)
         note_times.append([start_time, False])
 note_times = sorted(note_times)
+if not note_times:
+    raise SystemExit(f"{aff_file_path} 中没有找到音符。")
 
 # 使分音单位为指定数值
 def processed_fraction(decimal_number):
@@ -75,7 +90,6 @@ def processed_fraction(decimal_number):
     allowed_denominators = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 24]
     
     for denominator in allowed_denominators:
-        fraction = Fraction(decimal_number).limit_denominator()
         numerator = round(decimal_number * denominator)
         candidate_fraction = Fraction(numerator, denominator)
         
@@ -89,18 +103,26 @@ def processed_fraction(decimal_number):
 # 计算音符时值
 note_value = []
 
-unique_note_times = [note_times[0]]
-for i in range(1, len(note_times)):
-    if note_times[i][0] - unique_note_times[-1][0] > 5: # 相差5毫秒以内当成多押
-        unique_note_times.append(note_times[i])
+# 5ms 内视为多押；同一时间点只要有一条绿蛇/标记音符，就保留标记
+unique_note_times = []
+i = 0
+while i < len(note_times):
+    start_time, marked = note_times[i]
+    i += 1
+    while i < len(note_times) and note_times[i][0] - start_time <= 5:
+        marked = marked or note_times[i][1]
+        i += 1
+    unique_note_times.append([start_time, marked])
 
+timing_index = 0
 for i in range(1, len(unique_note_times)):
     current_time = unique_note_times[i][0]
     previous_time = unique_note_times[i - 1][0]
     
     # 计算跨越多个timing段的情况
+    # 音符时间单调递增，timing 指针只需向前移动
     duration = 0
-    j = 0
+    j = timing_index
     while j < len(timings) - 1 and timings[j + 1][0] <= previous_time:
         j += 1
     
@@ -121,6 +143,7 @@ for i in range(1, len(unique_note_times)):
         interval_ms = end_time - start_time
         beat_duration = 60000 / bpm
         duration += interval_ms / beat_duration
+    timing_index = j
 
     # 根据持续时间判断音符时值
     duration = processed_fraction(duration)
@@ -141,7 +164,10 @@ note_value_str = str(note_value).replace("'", '"')
 
 
 # 打印结果并将其写入文件
-print(note_value_str)
+if args.verbose:
+    print(note_value_str)
+else:
+    print(f"rhythm_{chart}.txt：{len(note_value)} 个节奏值")
 with open(rhythm_file_path, 'w', encoding='utf-8') as output_file:
     output_file.write(note_value_str)
 

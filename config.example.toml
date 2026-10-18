@@ -1,0 +1,18 @@
+# ArcaeaRhythmAnalysis 配置示例
+# 复制为 config.toml 后生效；存在 config.toml 时优先于 config.txt。
+# 谱面文件夹和难度在运行时选择，也可用 --folder/--chart 指定。
+
+[chart]
+speed = 1.0
+version = 0
+offset = 0              # 额外手动延迟（ms）
+longchart = 1           # 画布最小长度：0=680 拍，1=1200 拍
+max_bpm = 1000          # 默认忽略 >1000 的特效 BPM（如 9999999）；0=不过滤
+
+[audio]
+volume = 0.7
+format = "flac"         # flac | wav | ogg | mp3
+slow = 0
+
+[preview]
+width = 1280

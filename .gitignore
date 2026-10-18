@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.deps/
+.test_backup/
+.arcaea-cache.json
+*.egg-info/
+build/
+dist/

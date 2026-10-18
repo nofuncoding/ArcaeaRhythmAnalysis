@@ -1,0 +1,6 @@
+# Python >= 3.14
+numpy>=2.5
+soundfile>=0.14
+soxr>=1.1
+svgwrite>=1.4.3
+tqdm>=4.70

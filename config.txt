@@ -1,8 +1,5 @@
-folder=extradimensional
-# 谱面文件夹的名称，请确保其位于同路径下的charts文件夹下
-
-chart=4
-# 谱面的难度，2为ftr，3为byd，4为etr，不支持pst和prs
+# 谱面文件夹和难度在运行时选择，也可用 --folder/--chart 指定
+# 例如: arcaea-rhythm build --folder KikaiNoTsubasa --chart 3
 
 speed=1
 # 流速，默认为1，高bpm或低bpm可调整为0.5或2，用于等效bpm
@@ -16,8 +13,15 @@ offset=0
 volume=0.7
 # 音乐播放音量，默认0.7，如果按键音太响或太轻请酌情调整
 
-longchart=0
-# 长谱面选项，0为短谱面，1为长谱面（超过3min）
+audio_format=flac
+# 按键音输出格式：flac（推荐，编码快且无损）、wav、ogg、mp3
+# flac/wav 体积较大但生成快；ogg/mp3 体积小但编码慢
+
+longchart=1
+# 画布最小长度选项，0为短画布（680拍），1为长画布（1200拍）；长音频会自动延长
+
+max_bpm=1000
+# 特效 BPM 上限，默认1000，自动忽略9999999等特效 timing；0为不过滤
 
 width=1280
 # 节奏解析预览的宽度，根据自己电脑的情况进行设置
